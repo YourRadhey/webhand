@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hand Scanner</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto 20px;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 900px;
+            gap: 20px;
+        }
+        
+        .scanner-area {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+        
+        #webcam {
+            width: 100%;
+            height: auto;
+            display: block;
+            background-color: #000;
+        }
+        
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .hand-template {
+            width: 60%;
+            opacity: 0.7;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 0.8; }
+            100% { opacity: 0.5; }
+        }
+        
+        .status {
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px 25px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 1.1rem;
+            margin-top: 10px;
+            width: 100%;
+            max-width: 640px;
+            transition: all 0.3s ease;
+        }
+        
+        .detected {
+            background-color: rgba(46, 204, 113, 0.8);
+            animation: success 1s ease;
+        }
+        
+        @keyframes success {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 50px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-3px);
+        }
+        
+        button:active {
+            transform: translateY(1px);
+        }
+        
+        .video-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+        
+        .video-modal.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .video-container {
+            position: relative;
+            width: 80%;
+            max-width: 800px;
+        }
+        
+        #resultVideo {
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.2);
+        }
+        
+        .close-btn {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+        }
+        
+        footer {
+            margin-top: 30px;
+            text-align: center;
+            opacity: 0.7;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .subtitle {
+                font-size: 1rem;
+            }
+            
+            .hand-template {
+                width: 70%;
+            }
+            
+            .video-container {
+                width: 95%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Hand Scanner</h1>
+        <p class="subtitle">Position your hand inside the template to activate the scanner and unlock the content</p>
+    </header>
+    
+    <div class="container">
+        <div class="scanner-area">
+            <video id="webcam" autoplay playsinline></video>
+            <div class="overlay">
+                <svg class="hand-template" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M50,10 C60,10 70,15 75,25 C80,35 80,45 75,55 C70,65 60,70 50,70 C40,70 30,65 25,55 C20,45 20,35 25,25 C30,15 40,10 50,10 Z" 
+                          fill="none" stroke="#00ff88" stroke-width="2" stroke-dasharray="5,5"/>
+                    <path d="M35,30 C40,25 45,25 50,30 M50,30 C55,25 60,25 65,30 M35,45 C40,40 45,40 50,45 M50,45 C55,40 60,40 65,45 M35,60 C40,55 45,55 50,60 M50,60 C55,55 60,55 65,60" 
+                          fill="none" stroke="#00ff88" stroke-width="1.5"/>
+                </svg>
+            </div>
+        </div>
+        
+        <div class="status" id="status">
+            Position your hand inside the template
+        </div>
+        
+        <div class="controls">
+            <button id="startBtn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2"/>
+                    <path d="M10 8L16 12L10 16V8Z" fill="currentColor"/>
+                </svg>
+                Start Scanner
+            </button>
+            <button id="stopBtn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2"/>
+                    <rect x="9" y="9" width="6" height="6" fill="currentColor"/>
+                </svg>
+                Stop Scanner
+            </button>
+        </div>
+    </div>
+    
+    <div class="video-modal" id="videoModal">
+        <div class="video-container">
+            <button class="close-btn" id="closeVideo">&times;</button>
+            <video id="resultVideo" controls>
+                <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+    </div>
+    
+    <footer>
+        <p>Hand Scanner Web App | Compatible with Chrome, Edge, and other modern browsers</p>
+    </footer>
+
+    <!-- Include MediaPipe CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <script>
+        // DOM Elements
+        const webcamElement = document.getElementById('webcam');
+        const statusElement = document.getElementById('status');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const videoModal = document.getElementById('videoModal');
+        const resultVideo = document.getElementById('resultVideo');
+        const closeVideoBtn = document.getElementById('closeVideo');
+        
+        // Variables
+        let hands = null;
+        let camera = null;
+        let canvasCtx = null;
+        let isScanning = false;
+        let handDetected = false;
+        let detectionTimeout = null;
+        
+        // Initialize the application
+        function init() {
+            // Setup canvas for drawing landmarks
+            const canvasElement = document.createElement('canvas');
+            canvasElement.style.position = 'absolute';
+            canvasElement.style.top = '0';
+            canvasElement.style.left = '0';
+            canvasElement.style.width = '100%';
+            canvasElement.style.height = '100%';
+            document.querySelector('.scanner-area').appendChild(canvasElement);
+            canvasCtx = canvasElement.getContext('2d');
+            
+            // Initialize MediaPipe Hands
+            hands = new Hands({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                }
+            });
+            
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.7,
+                minTrackingConfidence: 0.7
+            });
+            
+            hands.onResults(onHandResults);
+            
+            // Event listeners
+            startBtn.addEventListener('click', startScanner);
+            stopBtn.addEventListener('click', stopScanner);
+            closeVideoBtn.addEventListener('click', closeVideo);
+            
+            // Initially disable stop button
+            stopBtn.disabled = true;
+        }
+        
+        // Start the hand scanner
+        async function startScanner() {
+            if (isScanning) return;
+            
+            try {
+                // Request camera access
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 640 }, 
+                        height: { ideal: 480 } 
+                    } 
+                });
+                
+                webcamElement.srcObject = stream;
+                
+                // Start processing the video stream
+                camera = new Camera(webcamElement, {
+                    onFrame: async () => {
+                        if (isScanning) {
+                            await hands.send({image: webcamElement});
+                        }
+                    },
+                    width: 640,
+                    height: 480
+                });
+                
+                camera.start();
+                isScanning = true;
+                
+                // Update UI
+                statusElement.textContent = "Scanner active - Position your hand";
+                statusElement.classList.remove('detected');
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                
+            } catch (error) {
+                console.error("Error accessing camera:", error);
+                statusElement.textContent = "Error: Could not access camera";
+            }
+        }
+        
+        // Stop the hand scanner
+        function stopScanner() {
+            if (!isScanning) return;
+            
+            if (camera) {
+                camera.stop();
+            }
+            
+            if (webcamElement.srcObject) {
+                const tracks = webcamElement.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+                webcamElement.srcObject = null;
+            }
+            
+            isScanning = false;
+            handDetected = false;
+            
+            // Clear canvas
+            canvasCtx.clearRect(0, 0, canvasCtx.canvas.width, canvasCtx.canvas.height);
+            
+            // Update UI
+            statusElement.textContent = "Scanner stopped";
+            statusElement.classList.remove('detected');
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            
+            // Clear any pending timeout
+            if (detectionTimeout) {
+                clearTimeout(detectionTimeout);
+                detectionTimeout = null;
+            }
+        }
+        
+        // Process hand detection results
+        function onHandResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasCtx.canvas.width, canvasCtx.canvas.height);
+            
+            // Draw webcam frame
+            canvasCtx.drawImage(results.image, 0, 0, canvasCtx.canvas.width, canvasCtx.canvas.height);
+            
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                // Draw hand landmarks and connections
+                for (const landmarks of results.multiHandLandmarks) {
+                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {
+                        color: '#00FF88',
+                        lineWidth: 2
+                    });
+                    drawLandmarks(canvasCtx, landmarks, {
+                        color: '#FF0000',
+                        lineWidth: 1,
+                        radius: 3
+                    });
+                }
+                
+                // Check if hand is within the template area
+                const templateArea = checkHandInTemplate(results.multiHandLandmarks[0]);
+                
+                if (templateArea && !handDetected) {
+                    handDetected = true;
+                    statusElement.textContent = "Hand detected! Playing content...";
+                    statusElement.classList.add('detected');
+                    
+                    // Show the video after a short delay
+                    detectionTimeout = setTimeout(() => {
+                        playVideo();
+                    }, 1500);
+                } else if (!templateArea && handDetected) {
+                    handDetected = false;
+                    statusElement.textContent = "Position your hand inside the template";
+                    statusElement.classList.remove('detected');
+                    
+                    // Clear any pending timeout
+                    if (detectionTimeout) {
+                        clearTimeout(detectionTimeout);
+                        detectionTimeout = null;
+                    }
+                }
+            } else {
+                // No hand detected
+                if (handDetected) {
+                    handDetected = false;
+                    statusElement.textContent = "Position your hand inside the template";
+                    statusElement.classList.remove('detected');
+                    
+                    // Clear any pending timeout
+                    if (detectionTimeout) {
+                        clearTimeout(detectionTimeout);
+                        detectionTimeout = null;
+                    }
+                }
+            }
+            
+            canvasCtx.restore();
+        }
+        
+        // Check if hand is within the template area
+        function checkHandInTemplate(landmarks) {
+            // Get the bounding box of the hand
+            const xCoords = landmarks.map(landmark => landmark.x);
+            const yCoords = landmarks.map(landmark => landmark.y);
+            
+            const minX = Math.min(...xCoords);
+            const maxX = Math.max(...xCoords);
+            const minY = Math.min(...yCoords);
+            const maxY = Math.max(...yCoords);
+            
+            // Define template area (centered, about 60% of the screen)
+            const templateLeft = 0.2;   // 20% from left
+            const templateRight = 0.8;  // 80% from left
+            const templateTop = 0.2;    // 20% from top
+            const templateBottom = 0.8; // 80% from top
+            
+            // Check if hand bounding box is within template area
+            return (
+                minX > templateLeft && 
+                maxX < templateRight && 
+                minY > templateTop && 
+                maxY < templateBottom
+            );
+        }
+        
+        // Play the result video
+        function playVideo() {
+            videoModal.classList.add('active');
+            resultVideo.currentTime = 0;
+            resultVideo.play();
+        }
+        
+        // Close the video modal
+        function closeVideo() {
+            videoModal.classList.remove('active');
+            resultVideo.pause();
+        }
+        
+        // Initialize the app when the page loads
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
